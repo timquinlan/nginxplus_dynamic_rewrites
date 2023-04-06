@@ -1,11 +1,11 @@
-curl -s -X POST -d '{"/abc":"/redirected"}' localhost/api/8/http/keyvals/redirects
+curl -s -X POST -d '{"/abc":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
 curl -s -X POST -d '{"/abc":"1996343255"}' localhost/api/8/http/keyvals/timebounds #this time is apr/5/2033
-curl -s -X POST -d '{"/def":"/redirected"}' localhost/api/8/http/keyvals/redirects
+curl -s -X POST -d '{"/def":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
 curl -s -X POST -d '{"/def":"1680637655"}' localhost/api/8/http/keyvals/timebounds #this time is apr/4/2023
 
-curl -s -X PATCH -d '{"/abc":null}' localhost/api/8/http/keyvals/redirects
+curl -s -X PATCH -d '{"/abc":null}' localhost/api/8/http/keyvals/rewrites
 curl -s -X PATCH -d '{"/abc":null}' localhost/api/8/http/keyvals/timebounds
-curl -s -X PATCH -d '{"/def":null}' localhost/api/8/http/keyvals/redirects
+curl -s -X PATCH -d '{"/def":null}' localhost/api/8/http/keyvals/rewrites
 curl -s -X PATCH -d '{"/def":null}' localhost/api/8/http/keyvals/timebounds
 
 
