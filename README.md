@@ -40,6 +40,7 @@ Use the NGINX+ API to check the keyvalue stores are populated:
     }
 
 **Virtual Server Overview and Test Cases**
+
 **Port 88:** acts as an upstream for the other servers to proxy_pass to. You won't interact with it directly.
 
 **Port 80:** uses an if statement before any content handling to evaluate if there is a rewrite entry in the keyvalue store, if there is it will rewrite the URI to the new value.  I included this to show that it can be done with out any additional logic beyond what is available in  normal nginx directives.  If one was to implement this, one would have to develop a method outside of NGINX to manage the keyvalue store entries, as this method simple executes a rewrite if there is an entry in the keyvalue store.  Check the file "api_cmds" for the approriate POST and PATCH curl commands to do so.  
@@ -74,12 +75,94 @@ Use the NGINX+ API to check the keyvalue stores are populated:
         }
     }
 
-The following test cases apply to this virtual server:
-We created a keyvalue zone called rewrites and populated it with entries for /abc and /def.  
+We created a keyvalue zone called rewrites and populated it with entries for /abc and /def.  The following test cases apply to this virtual server:
 
-**Port 81:** prior to any content handling it NJS to evaluate the keyvalue store, additionally there is a second keyvalue store that contains expire dates for the rewrite.  
 
-**Port 82:** **WIP/Mental Design Phase** the idea is to pack the new uri, start time and expiry time into some sort of delimited data or maybe JSON then use NJS to unpack and evaluate the data.
+    $ curl localhost:80/
+    content handled by proxy_pass
+    $ curl localhost:80/abc
+    this is the rewritten location
+    $ curl localhost:80/def
+    this is the rewritten location
+
+**Port 81:** prior to any content handling it uses NJS to evaluate the keyvalue store, if there is a rewrite present for the current URI it will check the timebounds keyvalue store and evaluate if the rewrite has has expired or not.  
+
+The njs for this method is called on every event.  The cr function checks the rewrites keyval zone, if there is no rewrite for the current uri it sets $testval to 0, causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  If there is a rewrite for the current uri it checks the timebounds keyval zone and determines if the rewrite is valid.  If the rewrite is valid it sets $testval to 1 which will execute a rewrite to the defined uri. If it is invalid it sets $testval to 2 which will execute a rewrite to the /expired location.
+
+
+    function cr(r) {
+        if (r.variables.newuri) {
+             const now = Math.floor(Date.now() / 1000);
+             if (now < r.variables.epochtimeout) {
+                 return(1);
+             } else if (now > r.variables.epochtimeout) {
+                 return(2);
+             }
+        }
+        return(0); //catch all
+    }
+    
+    export default {cr}
+
+
+The nginx.conf for this method is similar to the previous example.  However, note that there are now two keyval zones, a js_set call and two if statements:
+
+
+    keyval_zone zone=rewrites:1m;
+    keyval $uri $newuri zone=rewrites;
+    
+    keyval_zone zone=timebounds:1m;
+    keyval $uri $epochtimeout zone=timebounds;
+    
+    server {
+        listen 81;
+    
+        js_import /etc/nginx/njs/cr.js;
+        js_set $testval cr.cr;
+    
+        if ($testval = 1) {
+           #return 301 http://www.example.com$newuri/;
+           rewrite ^(.*)$ $newuri last;
+        }
+    
+        if ($testval = 2) {
+           rewrite ^(.*)$ /expired last;
+        }
+    
+        location / {
+            proxy_pass http://local_upstream;
+        }
+    
+        location /rewritten {
+            return 200 "this is the rewritten location\n";
+        }
+    
+        location /expired {
+            return 200 "that redirect is expired\n";
+        }
+    
+        location /api {
+            # don't use this in prod without adding some security!!!
+            api write=on;
+        }
+    
+        location = /dashboard.html {
+            root /usr/share/nginx/html;
+        }
+    }
+
+
+We created a keyvalue zone called rewrites and populated it with entries for /abc and /def.  We also created a keyvalue zone called timebounds and set /abc's timebound as sometime in the future, and set /def's timebound as sometime in the past. The following test cases apply to this virtual server:
+
+
+    $ curl localhost:81/
+    content handled by proxy_pass
+    $ curl localhost:81/abc
+    this is the rewritten location
+    $ curl localhost:81/def
+    that redirect is expired
+
+**Port 82:** **WIP/Mental Design Phase** the idea is to pack the new uri, start time and expiry time into some sort of delimited data or JSON into the KV then use NJS to unpack and evaluate the data.
 
 
 
