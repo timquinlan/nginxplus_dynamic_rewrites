@@ -1,7 +1,10 @@
 curl -s -X POST -d '{"/abc":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
-curl -s -X POST -d '{"/abc":"1996343255"}' localhost/api/8/http/keyvals/timebounds #this time is apr/5/2033
+curl -s -X POST -d '{"/abc":"1996343255"}' localhost/api/8/http/keyvals/timebounds #expires on apr/5/2033
 curl -s -X POST -d '{"/def":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
-curl -s -X POST -d '{"/def":"1680637655"}' localhost/api/8/http/keyvals/timebounds #this time is apr/4/2023
+curl -s -X POST -d '{"/def":"1680637655"}' localhost/api/8/http/keyvals/timebounds #expired on apr/4/2023
+curl -s -X POST -d '{"/abc":"/rewritten,1649277630,1996343255"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2022 until apr/5/2033
+curl -s -X POST -d '{"/def":"/rewritten,1649277630,1680637655"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2022 until apr/4/2023
+curl -s -X POST -d '{"/xyz":"/rewritten,1838666430,1996343255"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2028 until apr/4/2023
 
 curl -s -X PATCH -d '{"/abc":null}' localhost/api/8/http/keyvals/rewrites
 curl -s -X PATCH -d '{"/abc":null}' localhost/api/8/http/keyvals/timebounds
@@ -10,3 +13,8 @@ curl -s -X PATCH -d '{"/def":null}' localhost/api/8/http/keyvals/timebounds
 
 
 curl -s localhost/api/8/http/keyvals | jq
+
+
+
+
+
