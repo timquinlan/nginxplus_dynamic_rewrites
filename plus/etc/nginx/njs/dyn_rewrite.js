@@ -1,4 +1,4 @@
-function cr(r) {
+function dyn_rewrite(r) {
     if (r.variables.newuri) {
          const now = Math.floor(Date.now() / 1000);
          if (now < r.variables.epochtimeout) {
@@ -10,4 +10,4 @@ function cr(r) {
     return(0); //catch all
 }
 
-export default {cr}
+export default {dyn_rewrite}

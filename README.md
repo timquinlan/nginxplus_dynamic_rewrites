@@ -69,10 +69,6 @@ Use the NGINX+ API to check the keyvalue stores are populated:
             # don't use this in prod without adding some security!!!
             api write=on;
         }
-    
-        location = /dashboard.html {
-        root /usr/share/nginx/html;
-        }
     }
 
 We created a keyvalue zone called rewrites and populated it with entries for /abc and /def.  The following test cases apply to this virtual server:
@@ -144,10 +140,6 @@ The nginx.conf for this method is similar to the previous example.  However, not
         location /api {
             # don't use this in prod without adding some security!!!
             api write=on;
-        }
-    
-        location = /dashboard.html {
-            root /usr/share/nginx/html;
         }
     }
 
