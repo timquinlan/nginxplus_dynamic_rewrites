@@ -16,7 +16,7 @@ Clone this repo and use docker-compose to bring up the environment:
     cd nginxplus_dynamic_rewrites
     docker-compose up
 
-This demo explores using the NGINX+ keyvalue store to store rewrite info. I chose the keyvalue store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the keyvalue stores with the appropriate test data:
+This demo explores using the NGINX+ keyvalue store to store rewrite info. I chose the keyvalue store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the keyvalue stores with the appropriate test data.  This command populates three separate keyvalue zones: rewrites, timebounds and csv_data.  Rewrites is used in the first scenario, rewrites and timebounds are used in the second scenario and csv_data is used in the third scenario.
 
 
     curl -s -X POST -d '{"/abc":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
@@ -30,8 +30,13 @@ This demo explores using the NGINX+ keyvalue store to store rewrite info. I chos
 Use the NGINX+ API to check the keyvalue stores are populated:
 
 
-    curl -s localhost/api/8/http/keyvals | jq
+$ curl -s localhost/api/8/http/keyvals | jq
     {
+      "csv_data": {
+        "/abc": "/rewritten,1649277630,1996343255",
+        "/def": "/rewritten,1649277630,1680637655",
+        "/xyz": "/rewritten,1838666430,1996343255"
+      },
       "timebounds": {
         "/abc": "1996343255",
         "/def": "1680637655"
@@ -86,7 +91,7 @@ We created a keyvalue zone called rewrites and populated it with entries for /ab
 
 **Port 81:** prior to any content handling it uses NJS to evaluate the keyvalue store, if there is a rewrite present for the current URI it will check the timebounds keyvalue store and evaluate if the rewrite has has expired or not.  
 
-The njs for this example is called on every request.  The dyn_rewrite function checks the rewrites keyval zone, if there is no rewrite for the current uri it sets $testval to 0, causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  If there is a rewrite for the current uri it checks the timebounds keyval zone and determines if the rewrite is not expired.  If the rewrite is timebound is in the past, it sets $testval to 1 which will execute a rewrite to the defined uri. If it is invalid it sets $testval to 2 which will execute a rewrite to the /expired location.
+The njs for this example is called on every request.  The dyn_rewrite function checks the rewrites keyval zone, if there is no rewrite for the current uri it sets $evaluate_rewrite to 0, causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  If there is a rewrite for the current uri it checks the timebounds keyval zone and determines if the rewrite is not expired.  If the rewrite is timebound is in the past, it sets $evaluate_rewrite to 1 which will execute a rewrite to the defined uri. If it is invalid it sets $evaluate_rewrite to 2 which will execute a rewrite to the /expired location.
 
 
     function dyn_rewrite(r) {
@@ -112,13 +117,13 @@ The nginx.conf for this method is similar to the previous example.  It uses the 
         listen 81;
     
         js_import /etc/nginx/njs/dyn_rewrite.js;
-        js_set $testval dyn_rewrite.dyn_rewrite;
+        js_set $evaluate_rewrite dyn_rewrite.dyn_rewrite;
     
-        if ($testval = 1) {
+        if ($evaluate_rewrite = 1) {
            rewrite ^(.*)$ $newuri last;
         }
     
-        if ($testval = 2) {
+        if ($evaluate_rewrite = 2) {
            rewrite ^(.*)$ /expired last;
         }
     
@@ -154,7 +159,92 @@ We created a keyvalue zone called rewrites and populated it with entries for /ab
     $ curl localhost:81/def
     that redirect is expired
 
-**Port 82:** **WIP/Design Phase** the idea is to pack the new uri, start time and expiry time into some sort of delimited data or JSON into the KV then use NJS to unpack and evaluate the data.
+**Port 82:** this example stores data in the keyvalue zone in a csv format. Each entry includes the new uri, the start time and expire time. Prior to any content handling it uses NJS to evaluate the keyvalue store, if there is an entry present for the current URI it will split the csv data up to determine if the current time is between the start and expiry time and set the rewrite uri.
+
+The njs for this example is called twice every request.  The csv_rewrite function checks the csv_data keyval zone, and determinse if the current time is between the start and expire time of the rewrite.  If it sets evaluate_rewrite to 1, triggering a rewwrite.  If the current time is after the expiry time it sets evaluate_rewrite to 2, triggering a rewrite to the /expired location.  If there is no entry, or the current time is before the start time, evaluate_rewrite is set to 0 causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  Each request also checks the set_uri function.  This is only actually required if evaluate_rewrite is set to 1, however since js_set cannot be placed in an if statement, it gets called whether it is needed or not. 
 
 
+    function csv_rewrite(r) {
+        if (r.variables.csv_data) {
+             const now = Math.floor(Date.now() / 1000);
+             let fields = r.variables.csv_data.split(",");
+             let start = fields[1];
+             let expire = fields[2];
+             if (start <= now && now <= expire ) {
+                 return(1);
+             } else if (now >= expire) {
+                 return(2);
+             }
+        }
+        return(0); //catch all
+    }
+    
+    function set_uri(r) {
+        if (r.variables.csv_data) {
+           let fields = r.variables.csv_data.split(",");
+           return(fields[0]);
+        }
+        return;
+    }
+    
+    export default {csv_rewrite, set_uri}
+
+
+The nginx.conf for this method is similar to the previous example.  
+
+
+    server {
+        listen 82;
+    
+        js_import /etc/nginx/njs/csv_rewrite.js;
+        js_set $evaluate_rewrite csv_rewrite.csv_rewrite;
+        js_set $uri_from_csv csv_rewrite.set_uri;
+    
+        if ($evaluate_rewrite = 1) {
+           #return 301 http://www.example.com$newuri/;
+           rewrite ^(.*)$ $uri_from_csv last;
+        }
+    
+        if ($evaluate_rewrite = 2) {
+           rewrite ^(.*)$ /expired last;
+        }
+    
+        location / {
+            proxy_pass http://local_upstream;
+        }
+    
+        location /rewritten {
+            return 200 "this is the rewritten location\n";
+        }
+    
+        location /expired {
+            return 200 "that redirect is expired\n";
+        }
+    
+        location /api {
+            # don't use this in prod without adding some security!!!
+            api write=on;
+        }
+    
+        location = /dashboard.html {
+            root /usr/share/nginx/html;
+        }
+    }
+
+
+ 
+We created a keyvalue zone csv_data and populated it with entries for /abc, /def and /xyz.  The csv_data also include start and expiry times for each entry.  The entry for /abc is valid from apr/6/2022 until apr/5/2033, this is a valid rewrite. The entry for /def is valid from apr/6/2022 until apr/4/2023, this is an expired rewrite.  /xyz is valid from apr/6/2028 until apr/4/2023, this rewrite is not yet valid, the logic will simply ignore it and proceed with the normal content handling:
+
+
+    $ curl localhost:82
+    content handled by proxy_pass
+    $ curl localhost:82/abc
+    this is the rewritten location
+    $ curl localhost:82/def
+    that redirect is expired
+    $ curl localhost:82/xyz
+    content handled by proxy_pass
+
+
+z
 
