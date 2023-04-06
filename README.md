@@ -16,9 +16,30 @@ Clone this repo and use docker-compose to bring up the environment:
     cd nginxplus_dynamic_rewrites
     docker-compose up
 
-This demo explores using the NGINX+ keyvalue store to store rewrite info. I chose the KV store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.
+This demo explores using the NGINX+ keyvalue store to store rewrite info. I chose the KV store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the KV stores with the appropriate test data:
 
-**Port 80:** uses an if statement before any content handling to evaluate if there is a rewrite entry in the KV store, if there is it will rewrite the URI to the new value
+
+    curl -s -X POST -d '{"/abc":"/redirected"}' localhost/api/8/http/keyvals/redirects
+    curl -s -X POST -d '{"/abc":"1996343255"}' localhost/api/8/http/keyvals/timebounds #this time is apr/5/2033 so it won't be expired for quite some time
+    curl -s -X POST -d '{"/def":"/redirected"}' localhost/api/8/http/keyvals/redirects
+    curl -s -X POST -d '{"/def":"1680637655"}' localhost/api/8/http/keyvals/timebounds #this time is apr/4/2023 so it is expired 
+
+Use the NGINX+ API to check the keyvalue stores:
+
+
+    curl -s localhost/api/8/http/keyvals | jq
+    {
+      "timebounds": {
+        "/abc": "1996343255",
+        "/def": "1680637655"
+      },
+      "redirects": {
+        "/abc": "/redirected",
+        "/def": "/redirected"
+      }
+    }
+
+**Port 80:** uses an if statement before any content handling to evaluate if there is a rewrite entry in the KV store, if there is it will rewrite the URI to the new value.  I included this to show that it can be done with out any additional logic.  If one was to implement this, one would have to develop a method outside of NGINX to manage the KV store entries.  Check the file "api_cmds: for the approriate POST and PATCH curl commands to do so.  
 
 **Port 81:** uses NJS to evaluate the KV store, additionally there is a second KV store that contains expire dates for the rewrite.  
 
