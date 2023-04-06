@@ -20,33 +20,33 @@ Clone this repo and use docker-compose to bring up the environment:
 This demo explores using the NGINX+ keyvalue store to store rewrite info. I chose the keyvalue store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the keyvalue stores with the appropriate test data.  This command populates three separate keyvalue zones: rewrites, timebounds and csv_data.  Rewrites is used in the first scenario, rewrites and timebounds are used in the second scenario and csv_data is used in the third scenario.
 
 
-     curl -s -X POST -d '{"/abc":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
-     curl -s -X POST -d '{"/def":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
-     curl -s -X POST -d '{"/abc":"1996343255"}' localhost/api/8/http/keyvals/timebounds #expires on apr/5/2033
-     curl -s -X POST -d '{"/def":"1680637655"}' localhost/api/8/http/keyvals/timebounds #expired on apr/4/2023
-     curl -s -X POST -d '{"/abc":"/rewritten,1649277630,1996343255"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2022 until apr/5/2033
-     curl -s -X POST -d '{"/def":"/rewritten,1649277630,1680637655"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2022 until apr/4/2023
-     curl -s -X POST -d '{"/xyz":"/rewritten,1838666430,1996343255"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2028 until apr/5/2033 
+    curl -s -X POST -d '{"/abc":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
+    curl -s -X POST -d '{"/def":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
+    curl -s -X POST -d '{"/abc":"1996343255"}' localhost/api/8/http/keyvals/timebounds #expires on apr/5/2033
+    curl -s -X POST -d '{"/def":"1680637655"}' localhost/api/8/http/keyvals/timebounds #expired on apr/4/2023
+    curl -s -X POST -d '{"/abc":"/rewritten,1649277630,1996343255"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2022 until apr/5/2033
+    curl -s -X POST -d '{"/def":"/rewritten,1649277630,1680637655"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2022 until apr/4/2023
+    curl -s -X POST -d '{"/xyz":"/rewritten,1838666430,1996343255"}' localhost/api/8/http/keyvals/csv_data #valid from apr/6/2028 until apr/5/2033 
 
 Use the NGINX+ API to check the keyvalue stores are populated:
 
 
-$ curl -s localhost/api/8/http/keyvals | jq
-    {
-      "csv_data": {
-        "/abc": "/rewritten,1649277630,1996343255",
-        "/def": "/rewritten,1649277630,1680637655",
-        "/xyz": "/rewritten,1838666430,1996343255"
-      },
-      "timebounds": {
-        "/abc": "1996343255",
-        "/def": "1680637655"
-      },
-      "rewrites": {
-        "/abc": "/rewritten",
-        "/def": "/rewritten"
-      }
-    }
+    $ curl -s localhost/api/8/http/keyvals | jq
+        {
+          "csv_data": {
+            "/abc": "/rewritten,1649277630,1996343255",
+            "/def": "/rewritten,1649277630,1680637655",
+            "/xyz": "/rewritten,1838666430,1996343255"
+          },
+          "timebounds": {
+            "/abc": "1996343255",
+            "/def": "1680637655"
+          },
+          "rewrites": {
+            "/abc": "/rewritten",
+            "/def": "/rewritten"
+          }
+        }
 
 **Virtual Server Overview and Test Cases**
 
