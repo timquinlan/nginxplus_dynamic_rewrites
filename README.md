@@ -51,7 +51,7 @@ $ curl -s localhost/api/8/http/keyvals | jq
 
 **Port 88:** acts as an upstream for the other servers to proxy_pass to. You won't interact with it directly.
 
-**Port 80:** uses an if statement before any content handling to evaluate if there is a rewrite entry in the keyvalue store, if there is it will rewrite the URI to the new value.  I included this to show that it can be done with out any additional logic beyond what is available in  normal nginx directives.  If one was to implement this, one would have to develop a method outside of NGINX to manage the keyvalue store entries, as this method simple executes a rewrite if there is an entry in the keyvalue store.  Check the file "api_cmds" for the approriate POST and PATCH curl commands to do so.  
+**Port 80:** uses an if statement before any content handling to evaluate if there is a rewrite entry in the keyvalue store, if there is it will rewrite the URI to the new value.  I included this to show that it can be done with out any additional logic beyond what is available in  normal nginx directives.  
 
 
     keyval_zone zone=rewrites:1m;
@@ -89,9 +89,9 @@ We created a keyvalue zone called rewrites and populated it with entries for /ab
     $ curl localhost:80/def
     this is the rewritten location
 
-**Port 81:** prior to any content handling it uses NJS to evaluate the keyvalue store, if there is a rewrite present for the current URI it will check the timebounds keyvalue store and evaluate if the rewrite has has expired or not.  
+**Port 81:** prior to any content handling it uses NJS to evaluate the keyvalue stores, if there is a rewrite present for the current URI it will check the timebounds keyvalue store and evaluate if the rewrite has has expired or not.  
 
-The njs for this example is called on every request.  The dyn_rewrite function checks the rewrites keyval zone, if there is no rewrite for the current uri it sets $evaluate_rewrite to 0, causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  If there is a rewrite for the current uri it checks the timebounds keyval zone and determines if the rewrite is not expired.  If the rewrite is timebound is in the past, it sets $evaluate_rewrite to 1 which will execute a rewrite to the defined uri. If it is invalid it sets $evaluate_rewrite to 2 which will execute a rewrite to the /expired location.
+The njs for this example is called on every request.  The dyn_rewrite function checks the rewrites keyval zone, if there is no rewrite for the current uri it sets $evaluate_rewrite to 0, causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  If there is a rewrite for the current uri it checks the timebounds keyval zone and determines if the rewrite is not expired.  If the rewrite timebound is in the future, it sets $evaluate_rewrite to 1 which will execute a rewrite to the defined uri. If the rewrite timebound is in the past it sets $evaluate_rewrite to 2 which will execute a rewrite to the /expired location.
 
 
     function dyn_rewrite(r) {
@@ -108,7 +108,7 @@ The njs for this example is called on every request.  The dyn_rewrite function c
     
     export default {dyn_rewrite}
 
-The nginx.conf for this method is similar to the previous example.  It uses the keyvalue zone (rewrites) from the previous example. However, note that there is an additional keyval zone called timebounds, a js_set call and two if statements:
+The nginx.conf for this method is similar to the previous example.  It uses the keyvalue zone (rewrites) from the previous example plus a keyval zone called timebounds, a js_set call and two if statements:
 
     keyval_zone zone=timebounds:1m;
     keyval $uri $epochtimeout zone=timebounds;
@@ -149,7 +149,7 @@ The nginx.conf for this method is similar to the previous example.  It uses the 
         }
     }
 
-We created a keyvalue zone called rewrites and populated it with entries for /abc and /def.  We also created a keyvalue zone called timebounds and set /abc's timebound as sometime in the future, and set /def's timebound as sometime in the past. The following test cases apply to this virtual server:
+We created a keyvalue zone called rewrites and populated it with entries for /abc and /def.  We also created a keyvalue zone called timebounds and set /abc's timebound as sometime in the distant future, and set /def's timebound as sometime in the past. The following test cases apply to this virtual server:
 
 
     $ curl localhost:81/
@@ -161,7 +161,7 @@ We created a keyvalue zone called rewrites and populated it with entries for /ab
 
 **Port 82:** this example stores data in the keyvalue zone in a csv format. Each entry includes the new uri, the start time and expire time. Prior to any content handling it uses NJS to evaluate the keyvalue store, if there is an entry present for the current URI it will split the csv data up to determine if the current time is between the start and expiry time and set the rewrite uri.
 
-The njs for this example is called twice every request.  The csv_rewrite function checks the csv_data keyval zone, and determinse if the current time is between the start and expire time of the rewrite.  If it sets evaluate_rewrite to 1, triggering a rewwrite.  If the current time is after the expiry time it sets evaluate_rewrite to 2, triggering a rewrite to the /expired location.  If there is no entry, or the current time is before the start time, evaluate_rewrite is set to 0 causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  Each request also checks the set_uri function.  This is only actually required if evaluate_rewrite is set to 1, however since js_set cannot be placed in an if statement, it gets called whether it is needed or not. 
+NJS called twice every request in this example.  The csv_rewrite function checks the csv_data keyval zone, and determinse if the current time is between the start and expire time of the rewrite.  If so, it sets evaluate_rewrite to 1, triggering a rewwrite.  If the current time is after the expiry time it sets evaluate_rewrite to 2, triggering a rewrite to the /expired location.  If there is no entry, or the current time is before the start time, evaluate_rewrite is set to 0 causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  Each request also checks the set_uri function.  This is only actually required if evaluate_rewrite is set to 1, however since js_set cannot be placed in an if statement, set_uri gets called whether it is needed or not. 
 
 
     function csv_rewrite(r) {
@@ -190,7 +190,7 @@ The njs for this example is called twice every request.  The csv_rewrite functio
     export default {csv_rewrite, set_uri}
 
 
-The nginx.conf for this method is similar to the previous example.  
+The nginx.conf for this method is similar to the previous example, but has an additional js_set call to define and store a new variable called $uri_from_csv. 
 
 
     server {
@@ -246,5 +246,4 @@ We created a keyvalue zone csv_data and populated it with entries for /abc, /def
     content handled by proxy_pass
 
 
-z
-
+**Port 83:** this will combine the dynamic rewrites from the previous example with a more traditional static rewrite map. This combined method would keep the permanent rewrites in the map, and reserve the dynamic rewrite zones for temporary or newly added entries.  This combines the flexibility to to dynamically add/remove/update dynamic rewrites to the smallest zone possible while storing permanent rewrites in a more tradition, static manner.
