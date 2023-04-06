@@ -1,0 +1,11 @@
+version: '3.3'
+services:
+  # NGINX OSS LB
+  nginxplus:
+      hostname: plus 
+      build: plus-build
+      volumes:
+          - ./plus/etc/nginx:/etc/nginx
+      ports:
+        - 80:80
+        - 81:81
