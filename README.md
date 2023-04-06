@@ -83,10 +83,10 @@ We created a keyvalue zone called rewrites and populated it with entries for /ab
 
 **Port 81:** prior to any content handling it uses NJS to evaluate the keyvalue store, if there is a rewrite present for the current URI it will check the timebounds keyvalue store and evaluate if the rewrite has has expired or not.  
 
-The njs for this method is called on every event.  The cr function checks the rewrites keyval zone, if there is no rewrite for the current uri it sets $testval to 0, causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  If there is a rewrite for the current uri it checks the timebounds keyval zone and determines if the rewrite is valid.  If the rewrite is valid it sets $testval to 1 which will execute a rewrite to the defined uri. If it is invalid it sets $testval to 2 which will execute a rewrite to the /expired location.
+The njs for this example is called on every event.  The dyn_rewrite function checks the rewrites keyval zone, if there is no rewrite for the current uri it sets $testval to 0, causing nginx to bypass the if statemnets and continue on its normal flow of content handling.  If there is a rewrite for the current uri it checks the timebounds keyval zone and determines if the rewrite is valid.  If the rewrite is valid it sets $testval to 1 which will execute a rewrite to the defined uri. If it is invalid it sets $testval to 2 which will execute a rewrite to the /expired location.
 
 
-    function cr(r) {
+    function dyn_rewrite(r) {
         if (r.variables.newuri) {
              const now = Math.floor(Date.now() / 1000);
              if (now < r.variables.epochtimeout) {
@@ -98,23 +98,16 @@ The njs for this method is called on every event.  The cr function checks the re
         return(0); //catch all
     }
     
-    export default {cr}
-
+    export default {dyn_rewrite}
 
 The nginx.conf for this method is similar to the previous example.  However, note that there are now two keyval zones, a js_set call and two if statements:
 
-
-    keyval_zone zone=rewrites:1m;
-    keyval $uri $newuri zone=rewrites;
-    
-    keyval_zone zone=timebounds:1m;
-    keyval $uri $epochtimeout zone=timebounds;
     
     server {
         listen 81;
     
-        js_import /etc/nginx/njs/cr.js;
-        js_set $testval cr.cr;
+        js_import /etc/nginx/njs/dyn_rewrite.js;
+        js_set $testval dyn_rewrite.dyn_rewrite;
     
         if ($testval = 1) {
            #return 301 http://www.example.com$newuri/;
@@ -141,8 +134,11 @@ The nginx.conf for this method is similar to the previous example.  However, not
             # don't use this in prod without adding some security!!!
             api write=on;
         }
+    
+        location = /dashboard.html {
+            root /usr/share/nginx/html;
+        }
     }
-
 
 We created a keyvalue zone called rewrites and populated it with entries for /abc and /def.  We also created a keyvalue zone called timebounds and set /abc's timebound as sometime in the future, and set /def's timebound as sometime in the past. The following test cases apply to this virtual server:
 
