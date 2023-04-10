@@ -246,9 +246,36 @@ We created a keyvalue zone csv_data and populated it with entries for /abc, /def
     content handled by proxy_pass
 
 
-**Port 83:** this will combine the dynamic rewrites from the previous example with a more traditional static rewrite map. This combined method would keep the permanent rewrites in the map, and reserve the dynamic rewrite zones for temporary or newly added entries.  This combines the flexibility to dynamically add/remove/update rewrites to the smallest zone possible while storing permanent rewrites in a more traditional, static manner. 
+**Port 83:** This combines the dynamic rewrites from the previous example with a more traditional static rewrite map. This combined method keeps the permanent rewrites in the map, and reserve the dynamic rewrite zones for temporary or newly added entries.  This combines the flexibility to dynamically add/remove/update rewrites to the smallest zone possible while storing permanent rewrites in a more traditional, static manner. This example uses the same NJS as the previous example:
 
-uses the same NJS and KV as :82, adds a map and an new if statement before the NJS/KV part.  The map should be a separate include file for ease of manamgemen
+
+    function csv_rewrite(r) {
+        if (r.variables.csv_data) {
+             const now = Math.floor(Date.now() / 1000);
+             let fields = r.variables.csv_data.split(",");
+             let start = fields[1];
+             let expire = fields[2];
+             if (start <= now && now <= expire ) {
+                 return(1);
+             } else if (now >= expire) {
+                 return(2);
+             }
+        }
+        return(0); //catch all
+    }
+
+    function set_uri(r) {
+        if (r.variables.csv_data) {
+           let fields = r.variables.csv_data.split(",");
+           return(fields[0]);
+        }
+        return;
+    }
+
+    export default {csv_rewrite, set_uri}
+
+
+The nginx.conf adds a map and an new if statement before the NJS/KV part.  The map should be a separate include file for ease of manamgement, but is included inline here for clarity. 
 
     map $uri $map_uri {
        default "";
@@ -299,6 +326,25 @@ uses the same NJS and KV as :82, adds a map and an new if statement before the N
             root /usr/share/nginx/html;
         }
     }
+
+
+The flow is to first check the map and rewrite if there is a match, second check the keyvalue store and rewrite if there is a match, and finally if no matches are found continue on with normal content handling. The test cases are:
+
+
+    $ curl localhost:83
+    content handled by proxy_pass
+    $ curl localhost:83/abc
+    this is the rewritten location
+    $ curl localhost:83/def
+    that redirect is expired
+    $ curl localhost:83/xyz
+    content handled by proxy_pass
+    $ curl localhost:83/123
+    this is the rewritten location
+    $ curl localhost:83/456
+    this is the rewritten location
+    $ curl localhost:83/789
+    content handled by proxy_pass
 
 
 
