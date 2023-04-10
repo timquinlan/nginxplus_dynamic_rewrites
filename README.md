@@ -240,54 +240,54 @@ We created a keyvalue zone csv_data and populated it with entries for /abc, /def
 
 **Port 83:** this will combine the dynamic rewrites from the previous example with a more traditional static rewrite map. This combined method would keep the permanent rewrites in the map, and reserve the dynamic rewrite zones for temporary or newly added entries.  This combines the flexibility to dynamically add/remove/update rewrites to the smallest zone possible while storing permanent rewrites in a more traditional, static manner. 
 
-uses the same NJS and KV as :82, adds a map and an new if statement before the NJS/KV part
+uses the same NJS and KV as :82, adds a map and an new if statement before the NJS/KV part.  The map should be a separate include file for ease of manamgemen
 
-map $request_uri $map_uri {
-   default "";
-   /123 /rewritten;
-   /456 /rewritten;
-}
-
-server {
-    listen 83;
-
-    if ($map_uri) {
-       rewrite ^(.*)$ $map_uri last;
+    map $request_uri $map_uri {
+       default "";
+       /123 /rewritten;
+       /456 /rewritten;
     }
-
-    js_import /etc/nginx/njs/csv_rewrite.js;
-    js_set $evaluate_rewrite csv_rewrite.csv_rewrite;
-    js_set $uri_from_csv csv_rewrite.set_uri;
-
-    if ($evaluate_rewrite = 1) {
-       rewrite ^(.*)$ $uri_from_csv last;
+    
+    server {
+        listen 83;
+    
+        if ($map_uri) {
+           rewrite ^(.*)$ $map_uri last;
+        }
+    
+        js_import /etc/nginx/njs/csv_rewrite.js;
+        js_set $evaluate_rewrite csv_rewrite.csv_rewrite;
+        js_set $uri_from_csv csv_rewrite.set_uri;
+    
+        if ($evaluate_rewrite = 1) {
+           rewrite ^(.*)$ $uri_from_csv last;
+        }
+    
+        if ($evaluate_rewrite = 2) {
+           rewrite ^(.*)$ /expired last;
+        }
+    
+        location / {
+            proxy_pass http://local_upstream;
+        }
+    
+        location /rewritten {
+            return 200 "this is the rewritten location\n";
+        }
+    
+        location /expired {
+            return 200 "that redirect is expired\n";
+        }
+    
+        location /api {
+            # don't use this in prod without adding some security!!!
+            api write=on;
+        }
+    
+        location = /dashboard.html {
+            root /usr/share/nginx/html;
+        }
     }
-
-    if ($evaluate_rewrite = 2) {
-       rewrite ^(.*)$ /expired last;
-    }
-
-    location / {
-        proxy_pass http://local_upstream;
-    }
-
-    location /rewritten {
-        return 200 "this is the rewritten location\n";
-    }
-
-    location /expired {
-        return 200 "that redirect is expired\n";
-    }
-
-    location /api {
-        # don't use this in prod without adding some security!!!
-        api write=on;
-    }
-
-    location = /dashboard.html {
-        root /usr/share/nginx/html;
-    }
-}
 
 
 
