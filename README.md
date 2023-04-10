@@ -7,7 +7,7 @@ In addition to the key/cert you will need:
 * docker, docker-compose
 * authorization to build containers
 * authorization to forward host ports
-* ports 80 through 84 open on your host. If you need to change the ports you can modify docker-compose.yaml
+* ports 80 through 83 open on your host. If you need to change the ports you can modify docker-compose.yaml
 
 Clone this repo and use docker-compose to bring up the environment:
 
@@ -17,7 +17,7 @@ Clone this repo and use docker-compose to bring up the environment:
     cd nginxplus_dynamic_rewrites
     docker-compose up
 
-This demo explores using the NGINX+ keyvalue store to store rewrite info. I chose the keyvalue store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the keyvalue stores with the appropriate test data.  This command populates three separate keyvalue zones: rewrites, timebounds and csv_data.  Rewrites is used in the first scenario, rewrites and timebounds are used in the second scenario and csv_data is used in the third scenario.
+The most common way to manage rewrites is with a map. This method is robust but static; any changes to the map will require a reload.  This demo explores using the NGINX+ keyvalue store to store rewrite info. I chose the keyvalue store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the keyvalue stores with the appropriate test data.  These commands populates three separate keyvalue zones: rewrites, timebounds and csv_data.  Rewrites is used in the first scenario, rewrites and timebounds are used in the second scenario and csv_data is used in the third scenario.
 
 
     curl -s -X POST -d '{"/abc":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
@@ -100,7 +100,7 @@ The njs for this example is called on every request.  The dyn_rewrite function c
              const now = Math.floor(Date.now() / 1000);
              if (now < r.variables.epochtimeout) {
                  return(1);
-             } else if (now > r.variables.epochtimeout) {
+             } else if (now >= r.variables.epochtimeout) {
                  return(2);
              }
         }
@@ -143,10 +143,6 @@ The nginx.conf for this method is similar to the previous example.  It uses the 
         location /api {
             # don't use this in prod without adding some security!!!
             api write=on;
-        }
-    
-        location = /dashboard.html {
-            root /usr/share/nginx/html;
         }
     }
 
@@ -202,7 +198,6 @@ The nginx.conf for this method is similar to the previous example, but has an ad
         js_set $uri_from_csv csv_rewrite.set_uri;
     
         if ($evaluate_rewrite = 1) {
-           #return 301 http://www.example.com$newuri/;
            rewrite ^(.*)$ $uri_from_csv last;
         }
     
@@ -226,10 +221,6 @@ The nginx.conf for this method is similar to the previous example, but has an ad
             # don't use this in prod without adding some security!!!
             api write=on;
         }
-    
-        location = /dashboard.html {
-            root /usr/share/nginx/html;
-        }
     }
 
 
@@ -247,4 +238,56 @@ We created a keyvalue zone csv_data and populated it with entries for /abc, /def
     content handled by proxy_pass
 
 
-**Port 83:** this will combine the dynamic rewrites from the previous example with a more traditional static rewrite map. This combined method would keep the permanent rewrites in the map, and reserve the dynamic rewrite zones for temporary or newly added entries.  This combines the flexibility to to dynamically add/remove/update dynamic rewrites to the smallest zone possible while storing permanent rewrites in a more tradition, static manner.
+**Port 83:** this will combine the dynamic rewrites from the previous example with a more traditional static rewrite map. This combined method would keep the permanent rewrites in the map, and reserve the dynamic rewrite zones for temporary or newly added entries.  This combines the flexibility to dynamically add/remove/update rewrites to the smallest zone possible while storing permanent rewrites in a more traditional, static manner. 
+
+uses the same NJS and KV as :82, adds a map and an new if statement before the NJS/KV part
+
+map $request_uri $map_uri {
+   default "";
+   /123 /rewritten;
+   /456 /rewritten;
+}
+
+server {
+    listen 83;
+
+    if ($map_uri) {
+       rewrite ^(.*)$ $map_uri last;
+    }
+
+    js_import /etc/nginx/njs/csv_rewrite.js;
+    js_set $evaluate_rewrite csv_rewrite.csv_rewrite;
+    js_set $uri_from_csv csv_rewrite.set_uri;
+
+    if ($evaluate_rewrite = 1) {
+       rewrite ^(.*)$ $uri_from_csv last;
+    }
+
+    if ($evaluate_rewrite = 2) {
+       rewrite ^(.*)$ /expired last;
+    }
+
+    location / {
+        proxy_pass http://local_upstream;
+    }
+
+    location /rewritten {
+        return 200 "this is the rewritten location\n";
+    }
+
+    location /expired {
+        return 200 "that redirect is expired\n";
+    }
+
+    location /api {
+        # don't use this in prod without adding some security!!!
+        api write=on;
+    }
+
+    location = /dashboard.html {
+        root /usr/share/nginx/html;
+    }
+}
+
+
+

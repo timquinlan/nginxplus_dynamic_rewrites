@@ -1,6 +1,6 @@
 function csv_rewrite(r) {
     if (r.variables.csv_data) {
-         const now = Math.floor(Date.now() / 1000);
+         let now = Math.floor(Date.now() / 1000);
          let fields = r.variables.csv_data.split(",");
          let start = fields[1];
          let expire = fields[2];
