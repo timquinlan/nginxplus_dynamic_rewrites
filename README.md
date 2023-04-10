@@ -250,7 +250,7 @@ We created a keyvalue zone csv_data and populated it with entries for /abc, /def
 
 uses the same NJS and KV as :82, adds a map and an new if statement before the NJS/KV part.  The map should be a separate include file for ease of manamgemen
 
-    map $request_uri $map_uri {
+    map $uri $map_uri {
        default "";
        /123 /rewritten;
        /456 /rewritten;
