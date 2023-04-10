@@ -111,8 +111,13 @@ The njs for this example is called on every request.  The dyn_rewrite function c
 
 The nginx.conf for this method is similar to the previous example.  It uses the keyvalue zone (rewrites) from the previous example plus a keyval zone called timebounds, a js_set call and two if statements:
 
+
+
     keyval_zone zone=timebounds:1m;
     keyval $uri $epochtimeout zone=timebounds;
+
+    keyval_zone zone=rewrites:1m;
+    keyval $uri $newuri zone=rewrites;
     
     server {
         listen 81;
@@ -190,6 +195,9 @@ NJS called twice every request in this example.  The csv_rewrite function checks
 The nginx.conf for this method is similar to the previous example, but has an additional js_set call to define and store a new variable called $uri_from_csv. 
 
 
+    keyval_zone zone=csv_data:1m;
+    keyval $uri $csv_data zone=csv_data;
+
     server {
         listen 82;
     
@@ -247,6 +255,9 @@ uses the same NJS and KV as :82, adds a map and an new if statement before the N
        /123 /rewritten;
        /456 /rewritten;
     }
+
+    keyval_zone zone=csv_data:1m;
+    keyval $uri $csv_data zone=csv_data;
     
     server {
         listen 83;
