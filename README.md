@@ -52,6 +52,8 @@ Use the NGINX+ API to check the keyvalue stores are populated:
 
 **Port 88:** acts as an upstream for the other servers to proxy_pass to. You won't interact with it directly.
 
+**Port 89:** acts as a server to redirect to. Only used if you change the rewrite directives to "return 301 ....".
+
 **Port 80:** uses an if statement before any content handling to evaluate if there is a rewrite entry in the keyvalue store, if there is it will rewrite the URI to the new value.  I included this to show that it can be done with out any additional logic beyond what is available in  normal nginx directives.  
 
 
@@ -299,6 +301,8 @@ The nginx.conf adds a map and an new if statement before the NJS/KV part.  The m
     
         if ($evaluate_rewrite = 1) {
            rewrite ^(.*)$ $uri_from_csv last;
+           # to use redirects rather than rewrites, comment out ^^ and uncomment vv
+           # return 301 "http://localhost:89/$uri_from_csv";
         }
     
         if ($evaluate_rewrite = 2) {
