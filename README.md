@@ -44,9 +44,9 @@ Use the NGINX+ API to check the keyvalue stores are populated:
 
 **Virtual Server Overview and Test Cases**
 
-**Port 88:** acts as an upstream for the other servers to proxy_pass to. You won't interact with it directly.
+**Port 88:** acts as an upstream for the other servers to proxy_pass to, you won't interact with it directly.
 
-**Port 89:** acts as a server to redirect to. Only used if you change the rewrite directives to "return 301 ....".
+**Port 89:** acts as a server to redirect to, you won't interact with it directly. Only used if you change the rewrite directives to "return 301 ....".
 
 **Port 80:** prior to any content handling the map of uris is examined to evaluate if there is a rewrite entry, if there is it will rewrite the URI to the new value. This is the base configuration that we'll build on throughout the demo: 
 
@@ -86,8 +86,6 @@ Use the NGINX+ API to check the keyvalue stores are populated:
 The test cases are:
 
 
-    $ curl localhost:80/
-    content handled by proxy_pass
     $ curl localhost:80/abc
     content handled by proxy_pass
     $ curl localhost:80/123
@@ -141,10 +139,6 @@ The test cases are:
 The test cases are:
 
 
-    $ curl localhost:80/789
-    content handled by proxy_pass
-    $ curl localhost:81/
-    content handled by proxy_pass
     $ curl localhost:81/abc
     this is the rewritten location
     $ curl localhost:81/def
