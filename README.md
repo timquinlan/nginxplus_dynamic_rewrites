@@ -17,7 +17,7 @@ Clone this repo and use docker-compose to bring up the environment:
     cd nginxplus_dynamic_rewrites
     docker-compose up
 
-The most common way to manage rewrites is with a map. This method is robust but static; any changes to the map will require a reload.  This demo explores using the NGINX+ keyvalue store to augment a map. I chose the keyvalue store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the keyvalue stores with the appropriate test data.  These commands populates three separate keyvalue zones: rewrites, timebounds and csv_data.  Rewrites is used in the first scenario, rewrites and timebounds are used in the second scenario and csv_data is used in the third scenario.
+The most common way to manage rewrites is with a map. This method is robust but static; any changes to the map will require a reload.  This demo explores using the NGINX+ keyvalue store to augment a map. I chose the keyvalue store since one can create/update/remove entries on the fly with an api call.  The demo is a docker-compose instance that spins up just one node, that node has multiple virtual servers that do different things.  Before moving forward, you must populate the keyvalue stores with the appropriate test data.  These commands populate two separate keyvalue zones: rewrites and csv_data.  Rewrites is used in the second scenario and csv_data is used in the third scenario.
 
 
     curl -s -X POST -d '{"/abc":"/rewritten"}' localhost/api/8/http/keyvals/rewrites
